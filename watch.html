@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>צפייה · reem.bi</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23ff0033'/%3E%3Cpath d='M26 20l20 12-20 12z' fill='white'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="watch">
+
+  <iframe id="player" class="player" title="YouTube"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+    allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+
+  <!-- פס שקוף בראש המסך: העכבר מעל ה-iframe לא נקלט בדף, אז הפס הזה מחזיר את הסרגל -->
+  <div class="hot" id="hot" aria-hidden="true"></div>
+
+  <!-- סרגל צף קטן: חזרה לדף הבית + הדבקת קישור לסרטון אחר -->
+  <header class="bar" id="bar">
+    <a class="bar-home" href="index.html" title="לדף הבית">
+      <span class="dot" aria-hidden="true"></span>reem.bi
+    </a>
+    <form class="bar-form" id="form">
+      <input id="url" type="text" inputmode="url" autocomplete="off"
+        placeholder="הדביקו קישור YouTube או מזהה סרטון" aria-label="קישור לסרטון">
+      <button type="submit">נגן</button>
+    </form>
+  </header>
+
+  <script src="assets/config.js"></script>
+  <script>
+    (function () {
+      var cfg = window.SITE_CONFIG || {};
+      var player = document.getElementById("player");
+      var bar = document.getElementById("bar");
+      var input = document.getElementById("url");
+
+      // מחלץ מזהה סרטון (או פלייליסט) מכל צורת קישור נפוצה
+      function parse(text) {
+        text = (text || "").trim();
+        if (/^[\w-]{11}$/.test(text)) return { v: text };
+        try {
+          var u = new URL(text.indexOf("://") < 0 ? "https://" + text : text);
+          var list = u.searchParams.get("list");
+          var v = u.searchParams.get("v");
+          if (!v) {
+            var m = u.pathname.match(/^\/(?:embed\/|shorts\/|live\/|v\/)?([\w-]{11})(?:[/?]|$)/);
+            if (m && (u.hostname.indexOf("youtu") >= 0)) v = m[1];
+          }
+          if (v || list) return { v: v, list: list };
+        } catch (e) {}
+        return null;
+      }
+
+      function load(item, push) {
+        var base = "https://www.youtube-nocookie.com/embed/";
+        var q = "autoplay=1&rel=0&modestbranding=1&playsinline=1";
+        player.src = item.v
+          ? base + item.v + "?" + q + (item.list ? "&list=" + encodeURIComponent(item.list) : "")
+          : base + "videoseries?list=" + encodeURIComponent(item.list) + "&" + q;
+        if (push) {
+          var p = new URLSearchParams();
+          if (item.v) p.set("v", item.v);
+          if (item.list) p.set("list", item.list);
+          history.replaceState(null, "", "?" + p.toString());
+        }
+      }
+
+      var params = new URLSearchParams(location.search);
+      var start = (params.get("v") || params.get("list"))
+        ? { v: params.get("v"), list: params.get("list") }
+        : { v: cfg.defaultVideo };
+      load(start, false);
+
+      document.getElementById("form").addEventListener("submit", function (e) {
+        e.preventDefault();
+        var item = parse(input.value);
+        if (!item) { input.classList.add("bad"); setTimeout(function () { input.classList.remove("bad"); }, 600); return; }
+        input.value = "";
+        input.blur();
+        load(item, true);
+      });
+
+      // הסרגל נעלם כשלא זזים, וחוזר כשהעכבר מתקרב לראש המסך
+      var t;
+      function wake() {
+        bar.classList.remove("hidden");
+        clearTimeout(t);
+        t = setTimeout(function () { if (document.activeElement !== input) bar.classList.add("hidden"); }, 2800);
+      }
+      document.getElementById("hot").addEventListener("mouseenter", wake);
+      bar.addEventListener("mousemove", wake);
+      document.addEventListener("touchstart", wake, { passive: true });
+      input.addEventListener("blur", wake);
+      wake();
+    })();
+  </script>
+</body>
+</html>
